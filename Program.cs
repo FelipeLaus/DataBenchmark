@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace DataBenchmark
+﻿namespace DataBenchmark
 {
     internal class Program
     {
@@ -8,8 +6,16 @@ namespace DataBenchmark
         {
             var benchmark = new Benchmark();
 
-            //benchmark.CompareInsertUnique(10000);
-            //benchmark.PrintResults();
+            // Benchmark 1: Comparar inserção única
+            benchmark.CompareInsertUnique(10000);
+            benchmark.PrintResults();
+            benchmark.Clear();
+
+            Console.WriteLine("\n");
+
+            // Benchmark 2: Comparar busca em estruturas de dados
+            benchmark.CompareSearchDataStructures(300);
+            benchmark.PrintResults();
 
             Console.ReadKey();
         }

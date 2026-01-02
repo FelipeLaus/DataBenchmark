@@ -2,6 +2,8 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
+using Bogus;
 
 namespace DataBenchmark
 {
@@ -73,6 +75,114 @@ namespace DataBenchmark
             });
         }
 
+        public void CompareSearchDataStructures(int totalUsers)
+        {
+            var stopwatch = new Stopwatch();
+
+            List<User> users = new List<User>();
+            Dictionary<string, User> usersByName = new Dictionary<string, User>();
+            SortedDictionary<string, User> usersTree = new SortedDictionary<string, User>();
+
+            var faker = new Faker<User>("pt_BR")
+                .RuleFor(u => u.Id, f => f.IndexFaker + 1)
+                .RuleFor(u => u.Name, f => f.Name.FullName());
+
+            Console.WriteLine($"=== Busca em Estruturas de Dados - {totalUsers:N0} elementos ===\n");
+
+            // Lista
+            long listMemory = MemoryMeasurer.MeasureSize(() =>
+            {
+                users = new List<User>();
+                users.AddRange(faker.Generate(totalUsers / 2));
+                users.Add(new User { Id = totalUsers / 2 + 1, Name = "Nome Test" });
+                users.AddRange(faker.Generate(totalUsers - (totalUsers / 2 + 1)));
+            });
+
+            stopwatch.Start();
+            var userFind = users.FirstOrDefault(u => u.Name == "Nome Test");
+            stopwatch.Stop();
+            var listTimeMs = stopwatch.Elapsed.TotalMilliseconds;
+            var listTimeUs = stopwatch.Elapsed.TotalMicroseconds;
+            stopwatch.Reset();
+
+            results.Add(new BenchmarkResult
+            {
+                Name = "List - Search",
+                ElapsedMilliseconds = listTimeMs,
+                ElapsedMicroseconds = listTimeUs,
+                Complexity = "O(n)",
+                MemoryBytes = listMemory,
+                IsBaseline = true
+            });
+
+            // Dictionary
+            long dictMemory = MemoryMeasurer.MeasureSize(() =>
+            {
+                usersByName = new Dictionary<string, User>();
+                foreach (var user in faker.Generate(totalUsers / 2))
+                {
+                    usersByName[user.Name] = user;
+                }
+                var testUser = new User { Id = totalUsers / 2 + 1, Name = "Nome Test" };
+                usersByName[testUser.Name] = testUser;
+                foreach (var user in faker.Generate(totalUsers - (totalUsers / 2 + 1)))
+                {
+                    usersByName[user.Name] = user;
+                }
+            });
+
+            stopwatch.Start();
+            usersByName.TryGetValue("Nome Test", out var foundUser);
+            stopwatch.Stop();
+            var dictTimeMs = stopwatch.Elapsed.TotalMilliseconds;
+            var dictTimeUs = stopwatch.Elapsed.TotalMicroseconds;
+            stopwatch.Reset();
+
+            results.Add(new BenchmarkResult
+            {
+                Name = "Dictionary - Search",
+                ElapsedMilliseconds = dictTimeMs,
+                ElapsedMicroseconds = dictTimeUs,
+                Complexity = "O(1)",
+                MemoryBytes = dictMemory,
+                IsBaseline = false,
+                BaselineTime = listTimeUs
+            });
+
+            // SortedDictionary (Árvore Red-Black)
+            long treeMemory = MemoryMeasurer.MeasureSize(() =>
+            {
+                usersTree = new SortedDictionary<string, User>();
+                foreach (var user in faker.Generate(totalUsers / 2))
+                {
+                    usersTree[user.Name] = user;
+                }
+                var testUser = new User { Id = totalUsers / 2 + 1, Name = "Nome Test" };
+                usersTree[testUser.Name] = testUser;
+                foreach (var user in faker.Generate(totalUsers - (totalUsers / 2 + 1)))
+                {
+                    usersTree[user.Name] = user;
+                }
+            });
+
+            stopwatch.Start();
+            usersTree.TryGetValue("Nome Test", out var foundUserTree);
+            stopwatch.Stop();
+            var treeTimeMs = stopwatch.Elapsed.TotalMilliseconds;
+            var treeTimeUs = stopwatch.Elapsed.TotalMicroseconds;
+
+            results.Add(new BenchmarkResult
+            {
+                Name = "SortedDictionary - Search",
+                ElapsedMilliseconds = treeTimeMs,
+                ElapsedMicroseconds = treeTimeUs,
+                Complexity = "O(log n)",
+                MemoryBytes = treeMemory,
+                IsBaseline = false,
+                BaselineTime = listTimeUs
+            });
+        }
+
         public void PrintResults()
         {
             if (results.Count == 0)
@@ -81,11 +191,11 @@ namespace DataBenchmark
                 return;
             }
 
-            Console.WriteLine("\n" + new string('=', 100));
+            Console.WriteLine("\n" + new string('=', 120));
             Console.WriteLine("BENCHMARK RESULTS");
-            Console.WriteLine(new string('=', 100));
-            Console.WriteLine($"{"Operation",-35} {"Time (ms)",12} {"Time (µs)",15} {"Complexity",12} {"Performance",20}");
-            Console.WriteLine(new string('-', 100));
+            Console.WriteLine(new string('=', 120));
+            Console.WriteLine($"{"Operation",-35} {"Time (ms)",12} {"Time (µs)",15} {"Complexity",12} {"Memory (bytes)",18} {"Performance",20}");
+            Console.WriteLine(new string('-', 120));
 
             foreach (var result in results)
             {
@@ -93,25 +203,17 @@ namespace DataBenchmark
                     ? "Baseline" 
                     : CalculatePerformance(result.BaselineTime, result.ElapsedMicroseconds);
 
-                Console.WriteLine($"{result.Name,-35} {result.ElapsedMilliseconds,12:F4} {result.ElapsedMicroseconds,15:F2} {result.Complexity,12} {performance,20}");
+                string memory = result.MemoryBytes > 0 ? $"{result.MemoryBytes:N0}" : "-";
+
+                Console.WriteLine($"{result.Name,-35} {result.ElapsedMilliseconds,12:F4} {result.ElapsedMicroseconds,15:F2} {result.Complexity,12} {memory,18} {performance,20}");
             }
 
-            Console.WriteLine(new string('=', 100));
+            Console.WriteLine(new string('=', 120));
         }
 
         public void Clear()
         {
             results.Clear();
-        }
-
-        private class BenchmarkResult
-        {
-            public string Name { get; set; }
-            public double ElapsedMilliseconds { get; set; }
-            public double ElapsedMicroseconds { get; set; }
-            public string Complexity { get; set; }
-            public bool IsBaseline { get; set; }
-            public double BaselineTime { get; set; }
         }
     }
 }
